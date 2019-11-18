@@ -10,33 +10,13 @@
 
 // This is the main module for the WavPack command-line decompressor.
 
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <conio.h>
-#include <io.h>
-#else
-#if defined(__OS2__)
-#define INCL_DOSPROCESS
-#include <os2.h>
-#include <io.h>
-#endif
 #include <sys/stat.h>
 #include <sys/param.h>
 #include <locale.h>
 #include <iconv.h>
-#if defined (__GNUC__)
 #include <unistd.h>
 #include <glob.h>
-#endif
-#endif
-
-#if defined(__GNUC__) && !defined(_WIN32)
 #include <sys/time.h>
-#else
-#include <sys/timeb.h>
-#endif
-
 #include <math.h>
 #include <string.h>
 #include <fcntl.h>
@@ -48,16 +28,6 @@
 #include "utils.h"
 #include "md5.h"
 
-#ifdef _WIN32
-#include "win32_unicode_support.h"
-#define fputs fputs_utf8
-#define fprintf fprintf_utf8
-#define remove(f) unlink_utf8(f)
-#define rename(o,n) rename_utf8(o,n)
-#define fopen(f,m) fopen_utf8(f,m)
-#define strdup(x) _strdup(x)
-#endif
-
 ///////////////////////////// local variable storage //////////////////////////
 
 static const char *sign_on = "\n"
@@ -68,21 +38,12 @@ static const char *version_warning = "\n"
 " WARNING: WVUNPACK using libwavpack version %s, expected %s (see README)\n\n";
 
 static const char *usage =
-#if defined (_WIN32)
-" Usage:   WVUNPACK [-options] infile[.wv]|- [outfile[.ext]|outpath|-]\n\n"
-"          Wildcard characters (?,*) may be included in the input filename.\n"
-"          Output format and extension come from the source and by default\n"
-"          the entire file is restored (including headers and trailers).\n"
-"          However, this can be overridden to one of the supported formats\n"
-"          listed below (which discard the original headers).\n\n"
-#else
 " Usage:   WVUNPACK [-options] infile[.wv]|- [...] [-o outfile[.ext]|outpath|-]\n\n"
 "          Multiple input files may be specified. Output format and extension\n"
 "          come from the source and by default the entire file is restored\n"
 "          (including the original headers and trailers). However, this can\n"
 "          be overridden to one of the supported formats listed below (which\n"
 "          also causes the original headers to be discarded).\n\n"
-#endif
 " Formats: Microsoft RIFF:   'wav', force with -w or --wav, makes RF64 if > 4 GB\n"
 "          Sony Wave64:      'w64', force with --w64\n"
 "          Apple Core Audio: 'caf', force with --caf-be or --caf-le\n"
@@ -104,18 +65,10 @@ static const char *usage =
 "                (optional \"n\" = 1-10 for specific item, otherwise all)\n"
 "          --help = this help display\n"
 "          -i  = ignore .wvc file (forces hybrid lossy decompression)\n"
-#if defined (_WIN32) || defined (__OS2__)
-"          -l  = run at low priority (for smoother multitasking)\n"
-#endif
 "          -m  = calculate and display MD5 signature; verify if lossless\n"
 "          -n  = no audio decoding (use with -xx to extract tags only)\n"
-#ifdef _WIN32
-"          --no-utf8-convert = leave tag items in UTF-8 when extracting to files\n"
-"          --pause = pause before exiting (if console window disappears)\n"
-#else
 "          --no-utf8-convert = leave tag items in UTF-8 on extract or display\n"
 "          -o FILENAME | PATH = specify output filename or path\n"
-#endif
 "          -q  = quiet (keep console output to a minimum)\n"
 "          -r or --raw  = force raw audio decode (results in .raw extension)\n"
 "          -s  = display summary information only to stdout (no audio decode)\n"
@@ -137,11 +90,7 @@ static const char *usage =
 "                %t = tag field name (note: comes from data for binary tags)\n"
 "                %e = extension from binary tag source file, or 'txt' for text tag\n"
 "          -y  = yes to overwrite warning (use with caution!)\n"
-#if defined (_WIN32)
-"          -z  = don't set console title to indicate progress\n\n"
-#else
 "          -z1 = set console title to indicate progress\n\n"
-#endif
 " Web:     Visit www.wavpack.com for latest version and info\n";
 
 int WriteCaffHeader (FILE *outfile, WavpackContext *wpc, int64_t total_samples, int qmode);
@@ -167,7 +116,7 @@ static struct {
 // this global is used to indicate the special "debug" mode where extra debug messages
 // are displayed and all messages are logged to the file \wavpack.log
 
-int debug_logging_mode;
+int debug_logging_mode;// just enable debug level on logger?
 
 static int overwrite_all, delete_source, raw_decode, no_utf8_convert, no_audio_decode, file_info,
     summary, ignore_wvc, quiet_mode, calc_md5, copy_time, blind_decode, decode_format, format_specified, caf_be, set_console_title;
@@ -194,10 +143,6 @@ static void parse_sample_time_index (struct sample_time_index *dst, char *src);
 static int unpack_file (char *infilename, char *outfilename, int add_extension);
 static void display_progress (double file_progress);
 
-#ifdef _WIN32
-static void TextToUTF8 (void *string, int len);
-#endif
-
 #define WAVPACK_NO_ERROR    0
 #define WAVPACK_SOFT_ERROR  1
 #define WAVPACK_HARD_ERROR  2
@@ -207,32 +152,15 @@ static void TextToUTF8 (void *string, int len);
 // immediately afterward that converts the wchar argument list into UTF-8 strings
 // and sets the console to UTF-8 for better Unicode support.
 
-#ifdef _WIN32
-static int wvunpack_main(int argc, char **argv)
-#else
 int main(int argc, char **argv)
-#endif
 {
-#ifdef __EMX__ /* OS/2 */
-    _wildcard (&argc, &argv);
-#endif
     int verify_only = 0, error_count = 0, add_extension = 0, output_spec = 0, c_count = 0, x_count = 0;
     char outpath, **matches = NULL, *outfilename = NULL;
     int result;
 
-#if defined(_WIN32)
-    char selfname [MAX_PATH];
-
-    if (GetModuleFileName (NULL, selfname, sizeof (selfname)) && filespec_name (selfname) &&
-        _strupr (filespec_name (selfname)) && strstr (filespec_name (selfname), "DEBUG"))
-            debug_logging_mode = TRUE;
-
-    strcpy (selfname, *argv);
-#else
     if (filespec_name (*argv) &&
         (strstr (filespec_name (*argv), "ebug") || strstr (filespec_name (*argv), "DEBUG")))
             debug_logging_mode = TRUE;
-#endif
 
     if (debug_logging_mode) {
         char **argv_t = argv;
@@ -241,10 +169,6 @@ int main(int argc, char **argv)
         while (--argc_t)
             error_line ("arg %d: %s", argc - argc_t, *++argv_t);
     }
-
-#if defined (_WIN32)
-    set_console_title = 1;      // on Windows, we default to messing with the console title
-#endif                          // on Linux, this is considered uncool to do by default
 
     // loop through command-line arguments
 
@@ -265,10 +189,6 @@ int main(int argc, char **argv)
                 printf ("libwavpack %s\n", WavpackGetLibraryVersionString ());
                 return 0;
             }
-#ifdef _WIN32
-            else if (!strcmp (long_option, "pause"))                    // --pause
-                pause_mode = 1;
-#endif
             else if (!strcmp (long_option, "no-utf8-convert"))          // --no-utf8-convert
                 no_utf8_convert = 1;
             else if (!strncmp (long_option, "skip", 4)) {               // --skip
@@ -318,11 +238,7 @@ int main(int argc, char **argv)
                 ++error_count;
             }
         }
-#if defined (_WIN32)
-        else if ((**argv == '-' || **argv == '/') && (*argv)[1])
-#else
         else if ((**argv == '-') && (*argv)[1])
-#endif
             while (*++*argv)
                 switch (**argv) {
                     case 'Y': case 'y':
@@ -341,23 +257,10 @@ int main(int argc, char **argv)
                         delete_source = 1;
                         break;
 
-#if defined (_WIN32)
-                    case 'L': case 'l':
-                        SetPriorityClass (GetCurrentProcess(), IDLE_PRIORITY_CLASS);
-                        break;
-#elif defined (__OS2__)
-                    case 'L': case 'l':
-                        DosSetPriority (0, PRTYC_IDLETIME, 0, 0);
-                        break;
-#endif
-#if defined (_WIN32)
-                    case 'O': case 'o':  // ignore -o in Windows to be Linux compatible
-                        break;
-#else
                     case 'O': case 'o':
                         output_spec = 1;
                         break;
-#endif
+
                     case 'T': case 't':
                         copy_time = 1;
                         break;
@@ -459,27 +362,6 @@ int main(int argc, char **argv)
 
                 x_count = 0;
             }
-#if defined (_WIN32)
-            else if (!num_files) {
-                matches = realloc (matches, (num_files + 1) * sizeof (*matches));
-                matches [num_files] = malloc (strlen (*argv) + 10);
-                strcpy (matches [num_files], *argv);
-
-                if (*(matches [num_files]) != '-' && *(matches [num_files]) != '@' &&
-                    !filespec_ext (matches [num_files]))
-                        strcat (matches [num_files], ".wv");
-
-                num_files++;
-            }
-            else if (!outfilename) {
-                outfilename = malloc (strlen (*argv) + PATH_MAX);
-                strcpy (outfilename, *argv);
-            }
-            else {
-                error_line ("extra unknown argument: %s !", *argv);
-                ++error_count;
-            }
-#else
             else if (output_spec) {
                 outfilename = malloc (strlen (*argv) + PATH_MAX);
                 strcpy (outfilename, *argv);
@@ -496,7 +378,6 @@ int main(int argc, char **argv)
 
                 num_files++;
             }
-#endif
         }
     }
 
@@ -598,10 +479,6 @@ int main(int argc, char **argv)
                     break;
             }
 
-#if defined (_WIN32)
-            listbuff = realloc (listbuff, listbytes *= 2);
-            TextToUTF8 (listbuff, listbytes);
-#endif
             cp = listbuff;
 
             while ((c = *cp++)) {
@@ -634,44 +511,6 @@ int main(int argc, char **argv)
             free (listbuff);
             free (infilename);
         }
-#if defined (_WIN32)
-        else if (filespec_wild (infilename)) {
-            wchar_t *winfilename = utf8_to_utf16(infilename);
-            struct _wfinddata_t _wfinddata_t;
-            intptr_t file;
-            int di;
-
-            for (di = file_index; di < num_files - 1; di++)
-                matches [di] = matches [di + 1];
-
-            file_index--;
-            num_files--;
-
-            if ((file = _wfindfirst (winfilename, &_wfinddata_t)) != (intptr_t) -1) {
-                do {
-                    char *name_utf8;
-
-                    if (!(_wfinddata_t.attrib & _A_SUBDIR) && (name_utf8 = utf16_to_utf8(_wfinddata_t.name))) {
-                        matches = realloc (matches, ++num_files * sizeof (*matches));
-
-                        for (di = num_files - 1; di > file_index + 1; di--)
-                            matches [di] = matches [di - 1];
-
-                        matches [++file_index] = malloc (strlen (infilename) + strlen (name_utf8) + 10);
-                        strcpy (matches [file_index], infilename);
-                        *filespec_name (matches [file_index]) = '\0';
-                        strcat (matches [file_index], name_utf8);
-                        free (name_utf8);
-                    }
-                } while (_wfindnext (file, &_wfinddata_t) == 0);
-
-                _findclose (file);
-            }
-
-            free (winfilename);
-            free (infilename);
-        }
-#endif
     }
 
     // If the outfile specification begins with a '@', then it actually points
@@ -692,10 +531,6 @@ int main(int argc, char **argv)
 
         memset (listbuff, 0, sizeof (listbuff));
         c = (int) fread (listbuff, 1, sizeof (listbuff) - 1, list);   // assign c only to suppress warning
-
-#if defined (_WIN32)
-        TextToUTF8 (listbuff, PATH_MAX * 2);
-#endif
 
         while ((c = *lp++) == '\n' || c == '\r');
 
@@ -809,48 +644,6 @@ int main(int argc, char **argv)
     return error_count ? 1 : 0;
 }
 
-#ifdef _WIN32
-
-// On Windows, this "real" main() acts as a shell to our static wvunpack_main().
-// Its purpose is to convert the wchar command-line arguments into UTF-8 encoded
-// strings.
-
-int main(int argc, char **argv)
-{
-    int ret = -1, argc_utf8 = -1;
-    char **argv_utf8 = NULL;
-    char **argv_copy = NULL;
-
-    init_commandline_arguments_utf8(&argc_utf8, &argv_utf8);
-
-    // we have to make a copy of the argv pointer array because the command parser
-    // sometimes modifies them, which is problematic when it comes time to free them
-
-    if (argc_utf8 && argv_utf8) {
-        argv_copy = malloc (sizeof (char*) * argc_utf8);
-        memcpy (argv_copy, argv_utf8, sizeof (char*) * argc_utf8);
-    }
-
-    ret = wvunpack_main(argc_utf8, argv_copy);
-
-    if (argv_copy)
-        free (argv_copy);
-
-    free_commandline_arguments_utf8(&argc_utf8, &argv_utf8);
-
-    if (pause_mode) {
-        fprintf (stderr, "\nPress any key to continue . . . ");
-        fflush (stderr);
-        while (!_kbhit ());
-        _getch ();
-        fprintf (stderr, "\n");
-    }
-
-    return ret;
-}
-
-#endif
-
 // Parse the parameter of the --skip and --until commands, which are of the form:
 //   [+|-] [samples | hh:mm:ss.ss]
 // The value is returned in a double (in the "dst" struct) as either samples or
@@ -906,12 +699,6 @@ static FILE *open_output_file (char *filename, char **tempfilename)
     *tempfilename = NULL;
 
     if (*filename == '-') {
-#if defined(_WIN32)
-        _setmode (_fileno (stdout), O_BINARY);
-#endif
-#if defined(__OS2__)
-        setmode (fileno (stdout), O_BINARY);
-#endif
         return stdout;
     }
 
@@ -1015,18 +802,10 @@ static int unpack_file (char *infilename, char *outfilename, int add_extension)
     FILE *outfile;
     double dtime;
 
-#if defined(_WIN32)
-    struct __timeb64 time1, time2;
-#else
     struct timeval time1, time2;
     struct timezone timez;
-#endif
 
     // use library to open WavPack file
-
-#ifdef _WIN32
-    open_flags |= OPEN_FILE_UTF8;
-#endif
 
     if ((outfilename && !raw_decode && !blind_decode && !format_specified &&
         !skip.value_is_valid && !until.value_is_valid) || summary > 1)
@@ -1249,11 +1028,7 @@ static int unpack_file (char *infilename, char *outfilename, int add_extension)
         }
     }
 
-#if defined(_WIN32)
-    _ftime64 (&time1);
-#else
     gettimeofday(&time1,&timez);
-#endif
 
     if (outfile && !raw_decode) {
         if (until_samples_total) {
@@ -1388,23 +1163,10 @@ static int unpack_file (char *infilename, char *outfilename, int add_extension)
     // if we were writing to a temp file because the target file already existed,
     // do the rename / overwrite now (and if that fails, flag the error)
 
-#if defined(_WIN32)
-    if (result == WAVPACK_NO_ERROR && outfilename && outfilename_temp) {
-        if (remove (outfilename)) {
-            error_line ("can not remove file %s, result saved in %s!", outfilename, outfilename_temp);
-            result = WAVPACK_SOFT_ERROR;
-        }
-        else if (rename (outfilename_temp, outfilename)) {
-            error_line ("can not rename temp file %s to %s!", outfilename_temp, outfilename);
-            result = WAVPACK_SOFT_ERROR;
-        }
-    }
-#else
     if (result == WAVPACK_NO_ERROR && outfilename && outfilename_temp && rename (outfilename_temp, outfilename)) {
         error_line ("can not rename temp file %s to %s!", outfilename_temp, outfilename);
         result = WAVPACK_SOFT_ERROR;
     }
-#endif
 
     if (outfilename && outfilename_temp) free (outfilename_temp);
 
@@ -1440,15 +1202,9 @@ static int unpack_file (char *infilename, char *outfilename, int add_extension)
     // Compute and display the time consumed along with some other details of
     // the unpacking operation (assuming there was no error).
 
-#if defined(_WIN32)
-    _ftime64 (&time2);
-    dtime = time2.time + time2.millitm / 1000.0;
-    dtime -= time1.time + time1.millitm / 1000.0;
-#else
     gettimeofday(&time2,&timez);
     dtime = time2.tv_sec + time2.tv_usec / 1000000.0;
     dtime -= time1.tv_sec + time1.tv_usec / 1000000.0;
-#endif
 
     if (result == WAVPACK_NO_ERROR && !quiet_mode) {
         char *file, *fext, *oper, *cmode, cratio [16] = "";
@@ -1598,11 +1354,7 @@ static int unpack_audio (WavpackContext *wpc, FILE *outfile, int qmode, unsigned
             break;
 
         if (check_break ()) {
-#if defined(_WIN32)
-            fprintf (stderr, "^C\n");
-#else
             fprintf (stderr, "\n");
-#endif
             fflush (stderr);
             DoTruncateFile (outfile);
             result = WAVPACK_SOFT_ERROR;
@@ -1753,11 +1505,7 @@ static int unpack_dsd_audio (WavpackContext *wpc, FILE *outfile, int qmode, unsi
             break;
 
         if (check_break ()) {
-#if defined(_WIN32)
-            fprintf (stderr, "^C\n");
-#else
             fprintf (stderr, "\n");
-#endif
             fflush (stderr);
             DoTruncateFile (outfile);
             result = WAVPACK_SOFT_ERROR;
@@ -1923,6 +1671,8 @@ static int do_tag_extractions (WavpackContext *wpc, char *outfilename)
     return result;
 }
 
+// THIS IS DUPLICATE CODE, see verbatim copies elsewhere
+//
 // Code to store samples. Source is an array of int32_t data (which is what WavPack uses
 // internally), but the destination can have from 1 to 4 bytes per sample. Also, the destination
 // data is assumed to be little-endian and signed, except for byte data which is unsigned (these
@@ -2537,12 +2287,6 @@ static int dump_tag_item_to_file (WavpackContext *wpc, const char *tag_item, FIL
             if (!value_len || !dst)
                 return value_len;
 
-#if defined(_WIN32)
-            _setmode (_fileno (dst), O_TEXT);
-#endif
-#if defined(__OS2__)
-            setmode (fileno (dst), O_TEXT);
-#endif
             value = malloc (value_len * 2 + 1);
             WavpackGetTagItem (wpc, tag_item, value, value_len + 1);
             dump_UTF8_string (value, dst);
@@ -2561,12 +2305,6 @@ static int dump_tag_item_to_file (WavpackContext *wpc, const char *tag_item, FIL
                 if (!value [i]) {
 
                     if (dst) {
-#if defined(_WIN32)
-                        _setmode (_fileno (dst), O_BINARY);
-#endif
-#if defined(__OS2__)
-                        setmode (fileno (dst), O_BINARY);
-#endif
                         res = DoWriteFile (dst, (unsigned char *) value + i + 1, value_len - i - 1, &bcount);
                     }
 
@@ -2634,130 +2372,13 @@ static void dump_UTF8_string (char *string, FILE *dst)
 
         *p = 0;
 
-#ifdef _WIN32
-        if (!no_utf8_convert && dst != stdout && dst != stderr)
-#else
         if (!no_utf8_convert)
-#endif
             UTF8ToAnsi (temp, len * 2);
 
         fputs (temp, dst);
         free (temp);
     }
 }
-
-#if defined (_WIN32)
-
-// Convert Unicode UTF-8 string to wide format. UTF-8 string must be NULL
-// terminated. Resulting wide string must be able to fit in provided space
-// and will also be NULL terminated. The number of characters converted will
-// be returned (not counting terminator).
-
-static int UTF8ToWideChar (const unsigned char *pUTF8, wchar_t *pWide)
-{
-    int trail_bytes = 0;
-    int chrcnt = 0;
-
-    while (*pUTF8) {
-        if (*pUTF8 & 0x80) {
-            if (*pUTF8 & 0x40) {
-                if (trail_bytes) {
-                    trail_bytes = 0;
-                    chrcnt++;
-                }
-                else {
-                    char temp = *pUTF8;
-
-                    while (temp & 0x80) {
-                        trail_bytes++;
-                        temp <<= 1;
-                    }
-
-                    pWide [chrcnt] = temp >> trail_bytes--;
-                }
-            }
-            else if (trail_bytes) {
-                pWide [chrcnt] = (pWide [chrcnt] << 6) | (*pUTF8 & 0x3f);
-
-                if (!--trail_bytes)
-                    chrcnt++;
-            }
-        }
-        else
-            pWide [chrcnt++] = *pUTF8;
-
-        pUTF8++;
-    }
-
-    pWide [chrcnt] = 0;
-    return chrcnt;
-}
-
-// Convert the Unicode wide-format string into a UTF-8 string using no more
-// than the specified buffer length. The wide-format string must be NULL
-// terminated and the resulting string will be NULL terminated. The actual
-// number of characters converted (not counting terminator) is returned, which
-// may be less than the number of characters in the wide string if the buffer
-// length is exceeded.
-
-static int WideCharToUTF8 (const wchar_t *Wide, unsigned char *pUTF8, int len)
-{
-    const wchar_t *pWide = Wide;
-    int outndx = 0;
-
-    while (*pWide) {
-        if (*pWide < 0x80 && outndx + 1 < len)
-            pUTF8 [outndx++] = (unsigned char) *pWide++;
-        else if (*pWide < 0x800 && outndx + 2 < len) {
-            pUTF8 [outndx++] = (unsigned char) (0xc0 | ((*pWide >> 6) & 0x1f));
-            pUTF8 [outndx++] = (unsigned char) (0x80 | (*pWide++ & 0x3f));
-        }
-        else if (outndx + 3 < len) {
-            pUTF8 [outndx++] = (unsigned char) (0xe0 | ((*pWide >> 12) & 0xf));
-            pUTF8 [outndx++] = (unsigned char) (0x80 | ((*pWide >> 6) & 0x3f));
-            pUTF8 [outndx++] = (unsigned char) (0x80 | (*pWide++ & 0x3f));
-        }
-        else
-            break;
-    }
-
-    pUTF8 [outndx] = 0;
-    return (int)(pWide - Wide);
-}
-
-// Convert a text string into its Unicode UTF-8 format equivalent. The
-// conversion is done in-place so the maximum length of the string buffer must
-// be specified because the string may become longer or shorter. If the
-// resulting string will not fit in the specified buffer size then it is
-// truncated.
-
-static void TextToUTF8 (void *string, int len)
-{
-    unsigned char *inp = string;
-
-    // simple case: test for UTF8 BOM and if so, simply delete the BOM
-
-    if (len > 3 && inp [0] == 0xEF && inp [1] == 0xBB && inp [2] == 0xBF) {
-        memmove (inp, inp + 3, len - 3);
-        inp [len - 3] = 0;
-    }
-    else if (* (wchar_t *) string == 0xFEFF) {
-        wchar_t *temp = _wcsdup (string);
-
-        WideCharToUTF8 (temp + 1, (unsigned char *) string, len);
-        free (temp);
-    }
-    else {
-        int max_chars = (int) strlen (string);
-        wchar_t *temp = (wchar_t *) malloc ((max_chars + 1) * 2);
-
-        MultiByteToWideChar (CP_ACP, 0, string, -1, temp, max_chars + 1);
-        WideCharToUTF8 (temp, (unsigned char *) string, len);
-        free (temp);
-    }
-}
-
-#endif
 
 // Convert a Unicode UTF-8 format string into its Ansi equivalent. The
 // conversion is done in-place so the maximum length of the string buffer must
@@ -2768,22 +2389,6 @@ static void TextToUTF8 (void *string, int len)
 static void UTF8ToAnsi (char *string, int len)
 {
     int max_chars = (int) strlen (string);
-#if defined (_WIN32)
-    wchar_t *temp = malloc ((max_chars + 1) * 2);
-    int act_chars = UTF8ToWideChar (string, temp);
-
-    while (act_chars) {
-        memset (string, 0, len);
-
-        if (WideCharToMultiByte (CP_ACP, 0, temp, act_chars, string, len - 1, NULL, NULL))
-            break;
-        else
-            act_chars--;
-    }
-
-    if (!act_chars)
-        *string = 0;
-#else
     char *temp = malloc (len);
     char *outp = temp;
     char *inp = string;
@@ -2812,7 +2417,6 @@ static void UTF8ToAnsi (char *string, int len)
     }
 
     memmove (string, temp, len);
-#endif
     free (temp);
 }
 
@@ -2823,13 +2427,4 @@ static void UTF8ToAnsi (char *string, int len)
 // account the total number of files to generate a batch progress number.   //
 //////////////////////////////////////////////////////////////////////////////
 
-void display_progress (double file_progress)
-{
-    char title [40];
-
-    if (set_console_title) {
-        file_progress = (file_index + file_progress) / num_files;
-        sprintf (title, "%d%% (WvUnpack)", (int) ((file_progress * 100.0) + 0.5));
-        DoSetConsoleTitle (title);
-    }
-}
+void display_progress (double file_progress) {}

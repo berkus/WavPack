@@ -29,11 +29,11 @@
 
 #include "wavpack_local.h"
 
-#if defined (HAVE___BUILTIN_CTZ) || defined (_WIN64)
+// #if defined (HAVE___BUILTIN_CTZ) || defined (_WIN64)
 #define USE_CTZ_OPTIMIZATION    // use ctz intrinsic (or Windows equivalent) to count trailing ones
-#else
-#define USE_NEXT8_OPTIMIZATION  // optimization using a table to count trailing ones
-#endif
+// #else
+// #define USE_NEXT8_OPTIMIZATION  // optimization using a table to count trailing ones
+// #endif
 
 #define USE_BITMASK_TABLES      // use tables instead of shifting for certain masking operations
 
@@ -330,9 +330,6 @@ int32_t get_words_lossless (WavpackStream *wps, int32_t *buffer, int32_t nsample
     uint32_t ones_count, low, high;
     Bitstream *bs = &wps->wvbits;
     int32_t csamples;
-#ifdef USE_NEXT8_OPTIMIZATION
-    int32_t next8;
-#endif
 
     if (nsamples && !bs->ptr) {
         memset (buffer, 0, (wps->wphdr.flags & MONO_DATA) ? nsamples * 4 : nsamples * 8);
@@ -394,7 +391,6 @@ int32_t get_words_lossless (WavpackStream *wps, int32_t *buffer, int32_t nsample
             }
         }
 
-#ifdef USE_CTZ_OPTIMIZATION
         while (bs->bc < LIMIT_ONES) {
             if (++(bs->ptr) == bs->end)
                 bs->wrap (bs);
@@ -403,11 +399,7 @@ int32_t get_words_lossless (WavpackStream *wps, int32_t *buffer, int32_t nsample
             bs->bc += sizeof (*(bs->ptr)) * 8;
         }
 
-#ifdef _WIN32
-        { unsigned long res; _BitScanForward (&res, (unsigned long)~wps->wvbits.sr); ones_count = (uint32_t) res; }
-#else
         ones_count = __builtin_ctz (~wps->wvbits.sr);
-#endif
 
         if (ones_count >= LIMIT_ONES) {
             bs->bc -= ones_count;
@@ -444,80 +436,6 @@ int32_t get_words_lossless (WavpackStream *wps, int32_t *buffer, int32_t nsample
             bs->bc -= ones_count + 1;
             bs->sr >>= ones_count + 1;
         }
-#elif defined (USE_NEXT8_OPTIMIZATION)
-        if (bs->bc < 8) {
-            if (++(bs->ptr) == bs->end)
-                bs->wrap (bs);
-
-            next8 = (bs->sr |= *(bs->ptr) << bs->bc) & 0xff;
-            bs->bc += sizeof (*(bs->ptr)) * 8;
-        }
-        else
-            next8 = bs->sr & 0xff;
-
-        if (next8 == 0xff) {
-            bs->bc -= 8;
-            bs->sr >>= 8;
-
-            for (ones_count = 8; ones_count < (LIMIT_ONES + 1) && getbit (bs); ++ones_count);
-
-            if (ones_count == (LIMIT_ONES + 1))
-                break;
-
-            if (ones_count == LIMIT_ONES) {
-                uint32_t mask;
-                int cbits;
-
-                for (cbits = 0; cbits < 33 && getbit (bs); ++cbits);
-
-                if (cbits == 33)
-                    break;
-
-                if (cbits < 2)
-                    ones_count = cbits;
-                else {
-                    for (mask = 1, ones_count = 0; --cbits; mask <<= 1)
-                        if (getbit (bs))
-                            ones_count |= mask;
-
-                    ones_count |= mask;
-                }
-
-                ones_count += LIMIT_ONES;
-            }
-        }
-        else {
-            bs->bc -= (ones_count = ones_count_table [next8]) + 1;
-            bs->sr >>= ones_count + 1;
-        }
-#else
-        for (ones_count = 0; ones_count < (LIMIT_ONES + 1) && getbit (bs); ++ones_count);
-
-        if (ones_count >= LIMIT_ONES) {
-            uint32_t mask;
-            int cbits;
-
-            if (ones_count == (LIMIT_ONES + 1))
-                break;
-
-            for (cbits = 0; cbits < 33 && getbit (bs); ++cbits);
-
-            if (cbits == 33)
-                break;
-
-            if (cbits < 2)
-                ones_count = cbits;
-            else {
-                for (mask = 1, ones_count = 0; --cbits; mask <<= 1)
-                    if (getbit (bs))
-                        ones_count |= mask;
-
-                ones_count |= mask;
-            }
-
-            ones_count += LIMIT_ONES;
-        }
-#endif
 
         low = wps->w.holding_one;
         wps->w.holding_one = ones_count & 1;

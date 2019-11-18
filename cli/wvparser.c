@@ -22,22 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
-#ifdef _WIN32
-#include <io.h>
-#endif
-
-#if defined(_MSC_VER) && _MSC_VER < 1600
-typedef unsigned __int64 uint64_t;
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int16 uint16_t;
-typedef unsigned __int8 uint8_t;
-typedef __int64 int64_t;
-typedef __int32 int32_t;
-typedef __int16 int16_t;
-typedef __int8  int8_t;
-#else
 #include <stdint.h>
-#endif
 
 typedef int32_t (*read_stream)(void *, int32_t);
 
@@ -59,29 +44,29 @@ typedef struct {
 
 // or-values for "flags"
 
-#define BYTES_STORED	3	// 1-4 bytes/sample
-#define MONO_FLAG	4	// not stereo
-#define HYBRID_FLAG	8	// hybrid mode
-#define JOINT_STEREO	0x10	// joint stereo
-#define CROSS_DECORR	0x20	// no-delay cross decorrelation
-#define HYBRID_SHAPE	0x40	// noise shape (hybrid mode only)
-#define FLOAT_DATA	0x80	// ieee 32-bit floating point data
+#define BYTES_STORED    3   // 1-4 bytes/sample
+#define MONO_FLAG   4   // not stereo
+#define HYBRID_FLAG 8   // hybrid mode
+#define JOINT_STEREO    0x10    // joint stereo
+#define CROSS_DECORR    0x20    // no-delay cross decorrelation
+#define HYBRID_SHAPE    0x40    // noise shape (hybrid mode only)
+#define FLOAT_DATA  0x80    // ieee 32-bit floating point data
 
-#define INT32_DATA	0x100	// special extended int handling
-#define HYBRID_BITRATE	0x200	// bitrate noise (hybrid mode only)
-#define HYBRID_BALANCE	0x400	// balance noise (hybrid stereo mode only)
+#define INT32_DATA  0x100   // special extended int handling
+#define HYBRID_BITRATE  0x200   // bitrate noise (hybrid mode only)
+#define HYBRID_BALANCE  0x400   // balance noise (hybrid stereo mode only)
 
-#define INITIAL_BLOCK	0x800	// initial block of multichannel segment
-#define FINAL_BLOCK	0x1000	// final block of multichannel segment
+#define INITIAL_BLOCK   0x800   // initial block of multichannel segment
+#define FINAL_BLOCK 0x1000  // final block of multichannel segment
 
-#define SHIFT_LSB	13
-#define SHIFT_MASK	(0x1fL << SHIFT_LSB)
+#define SHIFT_LSB   13
+#define SHIFT_MASK  (0x1fL << SHIFT_LSB)
 
-#define MAG_LSB		18
-#define MAG_MASK	(0x1fL << MAG_LSB)
+#define MAG_LSB     18
+#define MAG_MASK    (0x1fL << MAG_LSB)
 
-#define SRATE_LSB	23
-#define SRATE_MASK	(0xfL << SRATE_LSB)
+#define SRATE_LSB   23
+#define SRATE_MASK  (0xfL << SRATE_LSB)
 
 #define FALSE_STEREO    0x40000000      // block is stereo, but data is mono
 #define NEW_SHAPING     0x20000000      // use IIR filter for negative shaping
@@ -141,24 +126,21 @@ int main ()
     char flags_list [256];
     WavpackHeader wphdr;
 
-#ifdef _WIN32
-    setmode (fileno (stdin), O_BINARY);
-#endif
     fprintf (stderr, "%s", sign_on);
 
     while (1) {
 
-	// read next WavPack header
+        // read next WavPack header
 
-	bcount = read_next_header (read_bytes, &wphdr);
+        bcount = read_next_header (read_bytes, &wphdr);
 
-	if (bcount == (uint32_t) -1) {
-	    printf ("\nend of file\n\n");
-	    break;
-	}
+        if (bcount == (uint32_t) -1) {
+            printf ("\nend of file\n\n");
+            break;
+        }
 
-	if (bcount)
-	    printf ("\nunknown data skipped, %u bytes\n", bcount);
+        if (bcount)
+            printf ("\nunknown data skipped, %u bytes\n", bcount);
 
         if (((wphdr.flags & SRATE_MASK) >> SRATE_LSB) == 15) {
             if (sample_rate != 44100)
@@ -173,8 +155,8 @@ int main ()
         if ((wphdr.flags & INITIAL_BLOCK) || !wphdr.block_samples)
             printf ("\n");
 
-	if (wphdr.block_samples) {
-	    printf ("%s audio block, version 0x%03x, %u samples in %u bytes, time = %.2f-%.2f\n",
+        if (wphdr.block_samples) {
+            printf ("%s audio block, version 0x%03x, %u samples in %u bytes, time = %.2f-%.2f\n",
                 (wphdr.flags & MONO_FLAG) ? "mono" : "stereo", wphdr.version, wphdr.block_samples, wphdr.ckSize + 8,
                 (double) wphdr.block_index / sample_rate, (double) (wphdr.block_index + wphdr.block_samples - 1) / sample_rate);
 
@@ -213,46 +195,46 @@ int main ()
         else
             printf ("non-audio block of %u bytes, version 0x%03x\n", wphdr.ckSize + 8, wphdr.version);
 
-	// read and parse the actual block data (which is entirely composed of "meta" blocks)
+        // read and parse the actual block data (which is entirely composed of "meta" blocks)
 
-	if (wphdr.ckSize > sizeof (WavpackHeader) - 8) {
-	    uint32_t block_size = wphdr.ckSize + 8;
-	    char *block_buff = malloc (block_size);
+        if (wphdr.ckSize > sizeof (WavpackHeader) - 8) {
+            uint32_t block_size = wphdr.ckSize + 8;
+            char *block_buff = malloc (block_size);
 
             memcpy (block_buff, &wphdr, sizeof (WavpackHeader));
-	    read_bytes (block_buff + sizeof (WavpackHeader), block_size - sizeof (WavpackHeader));
+            read_bytes (block_buff + sizeof (WavpackHeader), block_size - sizeof (WavpackHeader));
             parse_wavpack_block (block_buff);
-	    free (block_buff);
-	}
+            free (block_buff);
+        }
 
-	// if there's audio samples in there do some other sanity checks (especially for multichannel)
+        // if there's audio samples in there do some other sanity checks (especially for multichannel)
 
-	if (wphdr.block_samples) {
-	    if ((wphdr.flags & INITIAL_BLOCK) && wphdr.block_index != last_sample + 1)
-		printf ("error: discontinuity detected!\n");
+        if (wphdr.block_samples) {
+            if ((wphdr.flags & INITIAL_BLOCK) && wphdr.block_index != last_sample + 1)
+            printf ("error: discontinuity detected!\n");
 
-	    if (!(wphdr.flags & INITIAL_BLOCK))
-		if (first_sample != wphdr.block_index ||
-		    last_sample != wphdr.block_index + wphdr.block_samples - 1)
-			printf ("error: multichannel block mismatch detected!\n");
+            if (!(wphdr.flags & INITIAL_BLOCK))
+            if (first_sample != wphdr.block_index ||
+                last_sample != wphdr.block_index + wphdr.block_samples - 1)
+                printf ("error: multichannel block mismatch detected!\n");
 
-	    last_sample = (first_sample = wphdr.block_index) + wphdr.block_samples - 1;
+            last_sample = (first_sample = wphdr.block_index) + wphdr.block_samples - 1;
 
-	    if (wphdr.flags & INITIAL_BLOCK) {
-		channel_count = (wphdr.flags & MONO_FLAG) ? 1 : 2;
-		total_bytes = wphdr.ckSize + 8;
-		block_count = 1;
-	    }
-	    else {
-		channel_count += (wphdr.flags & MONO_FLAG) ? 1 : 2;
-		total_bytes += wphdr.ckSize + 8;
-		block_count++;
+            if (wphdr.flags & INITIAL_BLOCK) {
+                channel_count = (wphdr.flags & MONO_FLAG) ? 1 : 2;
+                total_bytes = wphdr.ckSize + 8;
+                block_count = 1;
+            }
+            else {
+                channel_count += (wphdr.flags & MONO_FLAG) ? 1 : 2;
+                total_bytes += wphdr.ckSize + 8;
+                block_count++;
 
-		if (wphdr.flags & FINAL_BLOCK)
-		    printf ("multichannel: %d channels in %d blocks, %u bytes total\n",
-			channel_count, block_count, total_bytes);
-	    }
-	}
+                if (wphdr.flags & FINAL_BLOCK)
+                    printf ("multichannel: %d channels in %d blocks, %u bytes total\n",
+                        channel_count, block_count, total_bytes);
+            }
+        }
     }
 
     return 0;
@@ -427,33 +409,33 @@ static uint32_t read_next_header (read_stream infile, WavpackHeader *wphdr)
     int bleft;
 
     while (1) {
-	if (sp < ep) {
-	    bleft = ep - sp;
-	    memmove (buffer, sp, bleft);
-	}
-	else
-	    bleft = 0;
+    if (sp < ep) {
+        bleft = ep - sp;
+        memmove (buffer, sp, bleft);
+    }
+    else
+        bleft = 0;
 
-	if (infile (buffer + bleft, sizeof (*wphdr) - bleft) != (int32_t) sizeof (*wphdr) - bleft)
-	    return -1;
+    if (infile (buffer + bleft, sizeof (*wphdr) - bleft) != (int32_t) sizeof (*wphdr) - bleft)
+        return -1;
 
-	sp = buffer;
+    sp = buffer;
 
-	if (*sp++ == 'w' && *sp == 'v' && *++sp == 'p' && *++sp == 'k' &&
+    if (*sp++ == 'w' && *sp == 'v' && *++sp == 'p' && *++sp == 'k' &&
             !(*++sp & 1) && sp [2] < 16 && !sp [3] && (sp [2] || sp [1] || *sp >= 24) && sp [5] == 4 &&
             sp [4] >= (MIN_STREAM_VERS & 0xff) && sp [4] <= (MAX_STREAM_VERS & 0xff) && sp [18] < 3 && !sp [19]) {
-		memcpy (wphdr, buffer, sizeof (*wphdr));
-		little_endian_to_native (wphdr, WavpackHeaderFormat);
-		return bytes_skipped;
-	    }
+        memcpy (wphdr, buffer, sizeof (*wphdr));
+        little_endian_to_native (wphdr, WavpackHeaderFormat);
+        return bytes_skipped;
+        }
 
         // printf ("read_next_header() did not see valid block right away: %c %c %c %c\n", buffer [0], buffer [1], buffer [2], buffer [3]);
 
-	while (sp < ep && *sp != 'w')
-	    sp++;
+    while (sp < ep && *sp != 'w')
+        sp++;
 
-	if ((bytes_skipped += sp - buffer) > 1024 * 1024)
-	    return -1;
+    if ((bytes_skipped += sp - buffer) > 1024 * 1024)
+        return -1;
     }
 }
 
@@ -465,27 +447,27 @@ static void little_endian_to_native (void *data, char *format)
     int32_t temp;
 
     while (*format) {
-	switch (*format) {
-	    case 'L':
-		temp = cp [0] + ((int32_t) cp [1] << 8) + ((int32_t) cp [2] << 16) + ((int32_t) cp [3] << 24);
-		* (int32_t *) cp = temp;
-		cp += 4;
-		break;
+    switch (*format) {
+        case 'L':
+        temp = cp [0] + ((int32_t) cp [1] << 8) + ((int32_t) cp [2] << 16) + ((int32_t) cp [3] << 24);
+        * (int32_t *) cp = temp;
+        cp += 4;
+        break;
 
-	    case 'S':
-		temp = cp [0] + (cp [1] << 8);
-		* (int16_t *) cp = (int16_t) temp;
-		cp += 2;
-		break;
+        case 'S':
+        temp = cp [0] + (cp [1] << 8);
+        * (int16_t *) cp = (int16_t) temp;
+        cp += 2;
+        break;
 
-	    default:
-		if (isdigit (*format))
-		    cp += *format - '0';
+        default:
+        if (isdigit (*format))
+            cp += *format - '0';
 
-		break;
-	}
+        break;
+    }
 
-	format++;
+    format++;
     }
 }
 

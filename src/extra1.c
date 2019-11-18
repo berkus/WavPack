@@ -34,18 +34,6 @@
 
 //#define EXTRA_DUMP        // dump generated filter data  error_line()
 
-#ifdef OPT_ASM_X86
-    #define PACK_DECORR_MONO_PASS_CONT pack_decorr_mono_pass_cont_x86
-#elif defined(OPT_ASM_X64) && (defined (_WIN64) || defined(__CYGWIN__) || defined(__MINGW64__))
-    #define PACK_DECORR_MONO_PASS_CONT pack_decorr_mono_pass_cont_x64win
-#elif defined(OPT_ASM_X64)
-    #define PACK_DECORR_MONO_PASS_CONT pack_decorr_mono_pass_cont_x64
-#endif
-
-#ifdef PACK_DECORR_MONO_PASS_CONT
-    void PACK_DECORR_MONO_PASS_CONT (int32_t *out_buffer, int32_t *in_buffer,  struct decorr_pass *dpp, int32_t sample_count);
-#endif
-
 typedef struct {
     int32_t *sampleptrs [MAX_NTERMS+2];
     struct decorr_pass dps [MAX_NTERMS];

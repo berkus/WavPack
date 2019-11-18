@@ -17,11 +17,7 @@
 
 #include "wavpack_local.h"
 
-#ifdef _WIN32
-#define stricmp(x,y) _stricmp(x,y)
-#else
 #define stricmp strcasecmp
-#endif
 
 static int get_ape_tag_item (M_Tag *m_tag, const char *item, char *value, int size, int type);
 static int get_id3_tag_item (M_Tag *m_tag, const char *item, char *value, int size);

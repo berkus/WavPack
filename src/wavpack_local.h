@@ -65,8 +65,8 @@ typedef int32_t f32;
 
 #include <stdio.h>
 
-#define FALSE 0
-#define TRUE 1
+// #define FALSE 0
+// #define TRUE 1
 
 // ID3v1 and APEv2 TAG formats (may occur at the end of WavPack files)
 

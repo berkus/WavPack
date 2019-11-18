@@ -11,28 +11,28 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#ifndef PATH_MAX
-#ifdef MAX_PATH
-#define PATH_MAX MAX_PATH
-#elif defined (MAXPATHLEN)
-#define PATH_MAX MAXPATHLEN
-#else
-#define PATH_MAX 1024
-#endif
-#endif
+// #ifndef PATH_MAX
+// #ifdef MAX_PATH
+// #define PATH_MAX MAX_PATH
+// #elif defined (MAXPATHLEN)
+// #define PATH_MAX MAXPATHLEN
+// #else
+// #define PATH_MAX 1024
+// #endif
+// #endif
 
-#if defined(_WIN32)
-#undef VERSION_OS
-#ifdef _WIN64
-#define VERSION_OS "Win64"
-#else
-#define VERSION_OS "Win32"
-#endif
-#define PACKAGE_VERSION "5.1.0"
-#endif
+// #if defined(_WIN32)
+// #undef VERSION_OS
+// #ifdef _WIN64
+// #define VERSION_OS "Win64"
+// #else
+// #define VERSION_OS "Win32"
+// #endif
+// #define PACKAGE_VERSION "5.1.0"
+// #endif
 
-#define FALSE 0
-#define TRUE 1
+// #define FALSE 0
+// #define TRUE 1
 
 #define CLEAR(destin) memset (&destin, 0, sizeof (destin));
 

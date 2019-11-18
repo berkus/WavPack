@@ -73,28 +73,28 @@ static int run_test_speed_modes (int wpconfig_flags, int test_flags, int bits, i
 static int run_test_extra_modes (int wpconfig_flags, int test_flags, int bits, int num_chans, int num_seconds);
 static int run_test (int wpconfig_flags, int test_flags, int bits, int num_chans, int num_seconds);
 
-#define NUM_WRITE_RANGES 10
-static struct { int start, stop; } write_ranges [NUM_WRITE_RANGES];
-int number_of_ranges;
+// #define NUM_WRITE_RANGES 10
+// static struct { int start, stop; } write_ranges [NUM_WRITE_RANGES];
+// int number_of_ranges;
 
-enum generator_type { noise, tone };
+// enum generator_type { noise, tone };
 
-struct audio_generator {
-    enum generator_type type;
-    union {
-        struct noise_generator {
-            float sum1, sum2, sum2p;                // these are changing
-            float factor, scalar;                   // these are constant
-        } noise_cxt;
+// struct audio_generator {
+//     enum generator_type type;
+//     union {
+//         struct noise_generator {
+//             float sum1, sum2, sum2p;                // these are changing
+//             float factor, scalar;                   // these are constant
+//         } noise_cxt;
 
-        struct tone_generator {
-            int sample_rate, samples_per_update;    // these are constant
-            int high_frequency, low_frequency;      // these are constant
-            float angle, velocity, acceleration;    // these are changing
-            int samples_left;
-        } tone_cxt;    
-    } u;
-};
+//         struct tone_generator {
+//             int sample_rate, samples_per_update;    // these are constant
+//             int high_frequency, low_frequency;      // these are constant
+//             float angle, velocity, acceleration;    // these are changing
+//             int samples_left;
+//         } tone_cxt;
+//     } u;
+// };
 
 static int seeking_test (char *filename, uint32_t test_count);
 static void tone_generator_init (struct audio_generator *cxt, int sample_rate, int low_freq, int high_freq);
@@ -140,28 +140,28 @@ int main (argc, argv) int argc; char **argv;
     // loop through command-line arguments
 
     while (--argc) {
-        if (**++argv == '-' && (*argv)[1] == '-' && (*argv)[2]) {
-            char *long_option = *argv + 2, *long_param = long_option;
+        // if (**++argv == '-' && (*argv)[1] == '-' && (*argv)[2]) {
+        //     char *long_option = *argv + 2, *long_param = long_option;
 
-            while (*long_param)
-                if (*long_param++ == '=')
-                    break;
+        //     while (*long_param)
+        //         if (*long_param++ == '=')
+        //             break;
 
-            if (!strcmp (long_option, "help")) {                        // --help
-                printf ("%s", usage);
-                return 0;
-            }
-            else if (!strcmp (long_option, "version")) {                // --version
-                printf ("wvtest %s\n", PACKAGE_VERSION);
-                printf ("libwavpack %s\n", WavpackGetLibraryVersionString ());
-                return 0;
-            }
-            else if (!strcmp (long_option, "short")) {                  // --short
-                base_minutes = 1;
-            }
-            else if (!strcmp (long_option, "long")) {                   // --long
-                base_minutes = 5;
-            }
+        //     if (!strcmp (long_option, "help")) {                        // --help
+        //         printf ("%s", usage);
+        //         return 0;
+        //     }
+            // else if (!strcmp (long_option, "version")) {                // --version
+            //     printf ("wvtest %s\n", PACKAGE_VERSION);
+            //     printf ("libwavpack %s\n", WavpackGetLibraryVersionString ());
+            //     return 0;
+            // }
+            // else if (!strcmp (long_option, "short")) {                  // --short
+            //     base_minutes = 1;
+            // }
+            // else if (!strcmp (long_option, "long")) {                   // --long
+            //     base_minutes = 5;
+            // }
             else if (!strcmp (long_option, "default")) {                // --default
                 test_flags |= TEST_FLAG_DEFAULT;
             }
@@ -235,10 +235,10 @@ int main (argc, argv) int argc; char **argv;
         }
     }
 
-    if (strcmp (WavpackGetLibraryVersionString (), PACKAGE_VERSION))
-        printf (version_warning, WavpackGetLibraryVersionString (), PACKAGE_VERSION);
-    else
-        printf (sign_on, VERSION_OS, WavpackGetLibraryVersionString ());
+    // if (strcmp (WavpackGetLibraryVersionString (), PACKAGE_VERSION))
+    //     printf (version_warning, WavpackGetLibraryVersionString (), PACKAGE_VERSION);
+    // else
+    //     printf (sign_on, VERSION_OS, WavpackGetLibraryVersionString ());
 
     if (!seektest && !(test_flags & (TEST_FLAG_DEFAULT | TEST_FLAG_EXHAUSTIVE))) {
         puts (usage);
@@ -251,35 +251,35 @@ int main (argc, argv) int argc; char **argv;
                 break;
     }
     else {
-        printf ("\n\n                          ****** pure lossless ******\n");
-        res = run_test_size_modes (wpconfig_flags, test_flags, base_minutes);
-        if (res) goto done;
+        // printf ("\n\n                          ****** pure lossless ******\n");
+        // res = run_test_size_modes (wpconfig_flags, test_flags, base_minutes);
+        // if (res) goto done;
 
-        if (!(test_flags & TEST_FLAG_NO_HYBRID)) {
-            printf ("\n\n                         ****** hybrid lossless ******\n");
-            res = run_test_size_modes (wpconfig_flags | CONFIG_HYBRID_FLAG | CONFIG_CREATE_WVC, test_flags, base_minutes);
-            if (res) goto done;
+        // if (!(test_flags & TEST_FLAG_NO_HYBRID)) {
+        //     printf ("\n\n                         ****** hybrid lossless ******\n");
+        //     res = run_test_size_modes (wpconfig_flags | CONFIG_HYBRID_FLAG | CONFIG_CREATE_WVC, test_flags, base_minutes);
+        //     if (res) goto done;
 
-            if (!(test_flags & TEST_FLAG_NO_LOSSY)) {
-                printf ("\n\n                          ****** hybrid lossy ******\n");
-                res = run_test_size_modes (wpconfig_flags | CONFIG_HYBRID_FLAG, test_flags, base_minutes);
-                if (res) goto done;
+        //     if (!(test_flags & TEST_FLAG_NO_LOSSY)) {
+        //         printf ("\n\n                          ****** hybrid lossy ******\n");
+        //         res = run_test_size_modes (wpconfig_flags | CONFIG_HYBRID_FLAG, test_flags, base_minutes);
+        //         if (res) goto done;
 
-                printf ("\n\n            ****** hybrid lossless (but ignore wvc on decode) ******\n");
-                res = run_test_size_modes (wpconfig_flags | CONFIG_HYBRID_FLAG | CONFIG_CREATE_WVC,
-                    test_flags | TEST_FLAG_IGNORE_WVC, base_minutes);
-                if (res) goto done;
-            }
-        }
+        //         printf ("\n\n            ****** hybrid lossless (but ignore wvc on decode) ******\n");
+        //         res = run_test_size_modes (wpconfig_flags | CONFIG_HYBRID_FLAG | CONFIG_CREATE_WVC,
+        //             test_flags | TEST_FLAG_IGNORE_WVC, base_minutes);
+        //         if (res) goto done;
+        //     }
+        // }
     }
 
 done:
-    if (res)
-        printf ("\ntest failed!\n\n");
-    else
-        printf ("\nall tests pass\n\n");
+    // if (res)
+    //     printf ("\ntest failed!\n\n");
+    // else
+    //     printf ("\nall tests pass\n\n");
 
-    return res;
+    // return res;
 }
 
 // Function to stress-test the WavpackSeekSample() API. Given the specified WavPack file, perform
@@ -542,7 +542,7 @@ static int run_test_size_modes (int wpconfig_flags, int test_flags, int base_min
             res = run_test_speed_modes (wpconfig_flags, test_flags | TEST_FLAG_FLOAT_DATA, 24, 6, base_minutes*60);
             if (res) return res;
         }
- 
+
         printf ("\n   *** 32-bit integer, 5.1 channels ***\n");
         res = run_test_speed_modes (wpconfig_flags, test_flags, 32, 6, base_minutes*60);
         if (res) return res;
@@ -551,7 +551,7 @@ static int run_test_size_modes (int wpconfig_flags, int test_flags, int base_min
             printf ("\n   *** 32-bit float stored as integer (pathological), 5.1 channels ***\n");
             res = run_test_speed_modes (wpconfig_flags, test_flags | TEST_FLAG_STORE_FLOAT_AS_INT32, 32, 6, base_minutes*60);
             if (res) return res;
-        
+
             if (!(wpconfig_flags & CONFIG_HYBRID_FLAG)) {
                 printf ("\n   *** 32-bit integer stored as float (pathological), 5.1 channels ***\n");
                 res = run_test_speed_modes (wpconfig_flags, test_flags | TEST_FLAG_STORE_INT32_AS_FLOAT, 32, 6, base_minutes*60);
@@ -572,30 +572,30 @@ static int run_test_size_modes (int wpconfig_flags, int test_flags, int base_min
 // Given a WavPack configuration and test flags, run the various combinations of
 // speed modes (i.e, fast, high, etc). A return value of FALSE indicates an error.
 
-static int run_test_speed_modes (int wpconfig_flags, int test_flags, int bits, int num_chans, int num_seconds)
-{
-    int res;
+// static int run_test_speed_modes (int wpconfig_flags, int test_flags, int bits, int num_chans, int num_seconds)
+// {
+//     int res;
 
-    if (!(test_flags & TEST_FLAG_NO_SPEEDS)) {
-        res = run_test_extra_modes (wpconfig_flags | CONFIG_FAST_FLAG, test_flags, bits, num_chans, num_seconds);
-        if (res) return res;
-    }
+//     if (!(test_flags & TEST_FLAG_NO_SPEEDS)) {
+//         res = run_test_extra_modes (wpconfig_flags | CONFIG_FAST_FLAG, test_flags, bits, num_chans, num_seconds);
+//         if (res) return res;
+//     }
 
-    res = run_test_extra_modes (wpconfig_flags, test_flags, bits, num_chans, num_seconds);
-    if (res) return res;
+//     res = run_test_extra_modes (wpconfig_flags, test_flags, bits, num_chans, num_seconds);
+//     if (res) return res;
 
-    if (!(test_flags & TEST_FLAG_NO_SPEEDS)) {
-        res = run_test_extra_modes (wpconfig_flags | CONFIG_HIGH_FLAG, test_flags, bits, num_chans, num_seconds);
-        if (res) return res;
-    }
+//     if (!(test_flags & TEST_FLAG_NO_SPEEDS)) {
+//         res = run_test_extra_modes (wpconfig_flags | CONFIG_HIGH_FLAG, test_flags, bits, num_chans, num_seconds);
+//         if (res) return res;
+//     }
 
-    if (!(test_flags & TEST_FLAG_NO_SPEEDS)) {
-        res = run_test_extra_modes (wpconfig_flags | CONFIG_VERY_HIGH_FLAG, test_flags, bits, num_chans, num_seconds);
-        if (res) return res;
-    }
+//     if (!(test_flags & TEST_FLAG_NO_SPEEDS)) {
+//         res = run_test_extra_modes (wpconfig_flags | CONFIG_VERY_HIGH_FLAG, test_flags, bits, num_chans, num_seconds);
+//         if (res) return res;
+//     }
 
-    return 0;
-}
+//     return 0;
+// }
 
 // Given a WavPack configuration and test flags, run the various combinations of "extra" modes (0-6).
 // Note that except for the base mode (no extra), the "default" and "exhaustive" configurations do
@@ -606,11 +606,11 @@ static int run_test_extra_modes (int wpconfig_flags, int test_flags, int bits, i
 {
     int res;
 
-    res = run_test (wpconfig_flags, test_flags, bits, num_chans, num_seconds);
-    if (res) return res;
+    // res = run_test (wpconfig_flags, test_flags, bits, num_chans, num_seconds);
+    // if (res) return res;
 
-    if (test_flags & TEST_FLAG_NO_EXTRAS)
-        return 0;
+    // if (test_flags & TEST_FLAG_NO_EXTRAS)
+    //     return 0;
 
     if (test_flags & TEST_FLAG_EXHAUSTIVE) {
         res = run_test (wpconfig_flags, test_flags | TEST_FLAG_EXTRA_MODE (1), bits, num_chans, num_seconds);
@@ -652,18 +652,18 @@ static int run_test_extra_modes (int wpconfig_flags, int test_flags, int bits, i
 // verify the result, otherwise the decoder is trusted to detect and report errors (although the
 // total number of samples is verified).
 
-#define BUFFER_SIZE 1000000
-#define NUM_GENERATORS 6
+// #define BUFFER_SIZE 1000000
+// #define NUM_GENERATORS 6
 
-struct audio_channel {
-    float audio_gain_hist [NUM_GENERATORS], audio_gain [NUM_GENERATORS], angle_offset;
-    int lfe_flag;
-};
+// struct audio_channel {
+//     float audio_gain_hist [NUM_GENERATORS], audio_gain [NUM_GENERATORS], angle_offset;
+//     int lfe_flag;
+// };
 
-#define SAMPLE_RATE 44100
-#define ENCODE_SAMPLES 128
-#define NOISE_GAIN 0.6667
-#define TONE_GAIN 0.3333
+// #define SAMPLE_RATE 44100
+// #define ENCODE_SAMPLES 128
+// #define NOISE_GAIN 0.6667
+// #define TONE_GAIN 0.3333
 
 static int run_test (int wpconfig_flags, int test_flags, int bits, int num_chans, int num_seconds)
 {
@@ -1337,7 +1337,7 @@ static void truncate_float_samples (float *samples, int num_samples, int bits)
             isample = floor (*samples * scalar);
 
         *samples++ = isample / scalar;
-    } 
+    }
 }
 
 static void float_to_integer_samples (float *samples, int num_samples, int bits)
@@ -1356,7 +1356,7 @@ static void float_to_integer_samples (float *samples, int num_samples, int bits)
 
         *(int32_t *)samples = isample << ishift;
         samples++;
-    } 
+    }
 }
 
 static void float_to_32bit_integer_samples (float *samples, int num_samples)
@@ -1389,9 +1389,12 @@ static void float_to_32bit_integer_samples (float *samples, int num_samples)
 
         *(int32_t *)samples = isample;
         samples++;
-    } 
+    }
 }
 
+// THIS IS DUPLICATED CODE, see verbatim copies elsewhere
+//
+//
 // Code to store samples. Source is an array of int32_t data (which is what WavPack uses
 // internally), but the destination can have from 1 to 4 bytes per sample. Also, the destination
 // data is assumed to be little-endian and signed, except for byte data which is unsigned (these

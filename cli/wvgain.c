@@ -50,13 +50,6 @@
 #include "wavpack.h"
 #include "utils.h"
 
-#ifdef _WIN32
-#include "win32_unicode_support.h"
-#define fputs fputs_utf8
-#define fprintf fprintf_utf8
-#define fopen(f,m) fopen_utf8(f,m)
-#endif
-
 ///////////////////////////// local variable storage //////////////////////////
 
 static const char *sign_on = "\n"
@@ -114,10 +107,6 @@ static int decimation_run (void *context, int32_t *samples, int num_samples);
 static void *decimation_destroy (void *context);
 static void display_progress (double file_progress);
 
-#ifdef _WIN32
-static void TextToUTF8 (void *string, int len);
-#endif
-
 #define WAVPACK_NO_ERROR    0
 #define WAVPACK_SOFT_ERROR  1
 #define WAVPACK_HARD_ERROR  2
@@ -127,32 +116,15 @@ static void TextToUTF8 (void *string, int len);
 // "real" main() defined immediately afterward that converts the wchar argument list
 // into UTF-8 strings and sets the console to UTF-8 for better Unicode support.
 
-#ifdef _WIN32
-static int wvgain_main(int argc, char **argv)
-#else
 int main(int argc, char **argv)
-#endif
 {
-#ifdef __EMX__ /* OS/2 */
-    _wildcard (&argc, &argv);
-#endif
     int  error_count = 0;
     char **matches = NULL;
     int result = WAVPACK_NO_ERROR;
 
-#if defined(_WIN32)
-    char selfname [MAX_PATH];
-
-    if (GetModuleFileName (NULL, selfname, sizeof (selfname)) && filespec_name (selfname) &&
-        _strupr (filespec_name (selfname)) && strstr (filespec_name (selfname), "DEBUG"))
-            debug_logging_mode = TRUE;
-
-    strcpy (selfname, *argv);
-#else
     if (filespec_name (*argv) &&
         (strstr (filespec_name (*argv), "ebug") || strstr (filespec_name (*argv), "DEBUG")))
             debug_logging_mode = TRUE;
-#endif
 
     if (debug_logging_mode) {
         char **argv_t = argv;
@@ -162,18 +134,10 @@ int main(int argc, char **argv)
             error_line ("arg %d: %s", argc - argc_t, *++argv_t);
     }
 
-#if defined (_WIN32)
-   set_console_title = 1;      // on Windows, we default to messing with the console title
-#endif                          // on Linux, this is considered uncool to do by default
-
     // loop through command-line arguments
 
     while (--argc) {
-#if defined (_WIN32)
-        if ((**++argv == '-' || **argv == '/') && (*argv)[1])
-#else
         if ((**++argv == '-') && (*argv)[1])
-#endif
             while (*++*argv)
                 switch (**argv) {
 
@@ -194,15 +158,6 @@ int main(int argc, char **argv)
                         display_mode = 1;
                         break;
 
-#if defined (_WIN32)
-                    case 'L': case 'l':
-                        SetPriorityClass (GetCurrentProcess(), IDLE_PRIORITY_CLASS);
-                        break;
-#elif defined (__OS2__)
-                    case 'L': case 'l':
-                        DosSetPriority (0, PRTYC_IDLETIME, 0, 0);
-                        break;
-#endif
                     case 'N': case 'n':
                         new_mode = 1;
                         break;
@@ -307,10 +262,6 @@ int main(int argc, char **argv)
                     break;
             }
 
-#if defined (_WIN32)
-            listbuff = realloc (listbuff, listbytes *= 2);
-            TextToUTF8 (listbuff, listbytes);
-#endif
             cp = listbuff;
 
             while ((c = *cp++)) {
@@ -343,44 +294,6 @@ int main(int argc, char **argv)
             free (listbuff);
             free (infilename);
         }
-#if defined (_WIN32)
-        else if (filespec_wild (infilename)) {
-            wchar_t *winfilename = utf8_to_utf16(infilename);
-            struct _wfinddata_t _wfinddata_t;
-            intptr_t file;
-            int di;
-
-            for (di = file_index; di < num_files - 1; di++)
-                matches [di] = matches [di + 1];
-
-            file_index--;
-            num_files--;
-
-            if ((file = _wfindfirst (winfilename, &_wfinddata_t)) != (intptr_t) -1) {
-                do {
-                    char *name_utf8;
-
-                    if (!(_wfinddata_t.attrib & _A_SUBDIR) && (name_utf8 = utf16_to_utf8(_wfinddata_t.name))) {
-                        matches = realloc (matches, ++num_files * sizeof (*matches));
-
-                        for (di = num_files - 1; di > file_index + 1; di--)
-                            matches [di] = matches [di - 1];
-
-                        matches [++file_index] = malloc (strlen (infilename) + strlen (name_utf8) + 10);
-                        strcpy (matches [file_index], infilename);
-                        *filespec_name (matches [file_index]) = '\0';
-                        strcat (matches [file_index], name_utf8);
-                        free (name_utf8);
-                    }
-                } while (_wfindnext (file, &_wfinddata_t) == 0);
-
-                _findclose (file);
-            }
-
-            free (winfilename);
-            free (infilename);
-        }
-#endif
     }
 
     // if we found any files to process, this is where we start
@@ -409,11 +322,7 @@ int main(int argc, char **argv)
             if (new_mode) {
                 WavpackContext *wpc;
                 char error [80];
-#ifdef _WIN32
-                wpc = WavpackOpenFileInput (matches [file_index], error, OPEN_TAGS | OPEN_FILE_UTF8 | OPEN_DSD_AS_PCM, 0);
-#else
                 wpc = WavpackOpenFileInput (matches [file_index], error, OPEN_TAGS | OPEN_DSD_AS_PCM, 0);
-#endif
                 if (wpc) {
                     int alreadyHasTag = WavpackGetTagItem (wpc, album_mode ? "replaygain_album_gain" : "replaygain_track_gain", NULL, 0);
                     WavpackCloseFile (wpc);
@@ -536,40 +445,6 @@ int main(int argc, char **argv)
     return error_count ? 1 : 0;
 }
 
-#ifdef _WIN32
-
-// On Windows, this "real" main() acts as a shell to our static wvgain_main().
-// Its purpose is to convert the wchar command-line arguments into UTF-8 encoded
-// strings and set the console output to UTF-8.
-
-int main(int argc, char **argv)
-{
-    int ret = -1, argc_utf8 = -1;
-    char **argv_utf8 = NULL;
-    char **argv_copy = NULL;
-
-    init_commandline_arguments_utf8(&argc_utf8, &argv_utf8);
-
-    // we have to make a copy of the argv pointer array because the command parser
-    // sometimes modifies them, which is problematic when it comes time to free them
-
-    if (argc_utf8 && argv_utf8) {
-        argv_copy = malloc (sizeof (char*) * argc_utf8);
-        memcpy (argv_copy, argv_utf8, sizeof (char*) * argc_utf8);
-    }
-
-    ret = wvgain_main(argc_utf8, argv_copy);
-
-    if (argv_copy)
-        free (argv_copy);
-
-    free_commandline_arguments_utf8(&argc_utf8, &argv_utf8);
-
-    return ret;
-}
-
-#endif
-
 // Unpack the specified WavPack input file and analyze it for ReplayGain
 // information.
 
@@ -594,10 +469,6 @@ static int analyze_file (char *infilename, uint32_t *histogram, float *peak)
     *peak = 0.0;
 
     // use library to open WavPack file
-
-#ifdef _WIN32
-    open_flags |= OPEN_FILE_UTF8;
-#endif
 
     if (!ignore_wvc)
         open_flags |= OPEN_WVC;
@@ -704,11 +575,7 @@ static int analyze_file (char *infilename, uint32_t *histogram, float *peak)
             break;
 
         if (check_break ()) {
-#if defined(_WIN32)
-            fprintf (stderr, "^C\n");
-#else
             fprintf (stderr, "\n");
-#endif
             fflush (stderr);
             result = WAVPACK_HARD_ERROR;
             break;
@@ -761,11 +628,7 @@ static int update_file (char *infilename, float track_gain, float track_peak, fl
 
     // use library to open WavPack file
 
-#ifdef _WIN32
-    wpc = WavpackOpenFileInput (infilename, error, OPEN_EDIT_TAGS | OPEN_FILE_UTF8 | OPEN_DSD_AS_PCM, 0);
-#else
     wpc = WavpackOpenFileInput (infilename, error, OPEN_EDIT_TAGS | OPEN_DSD_AS_PCM, 0);
-#endif
 
     if (!wpc) {
         error_line (error);
@@ -866,11 +729,7 @@ static int show_file_info (char *infilename, FILE *dst)
 
     // use library to open WavPack file
 
-#ifdef _WIN32
-    wpc = WavpackOpenFileInput (infilename, error, OPEN_TAGS | OPEN_FILE_UTF8 | OPEN_DSD_AS_PCM, 0);
-#else
     wpc = WavpackOpenFileInput (infilename, error, OPEN_TAGS | OPEN_DSD_AS_PCM, 0);
-#endif
 
     if (!wpc) {
         error_line (error);
@@ -1386,74 +1245,6 @@ static void *decimation_destroy (void *context)
     return NULL;
 }
 
-#ifdef _WIN32
-
-// Convert the Unicode wide-format string into a UTF-8 string using no more
-// than the specified buffer length. The wide-format string must be NULL
-// terminated and the resulting string will be NULL terminated. The actual
-// number of characters converted (not counting terminator) is returned, which
-// may be less than the number of characters in the wide string if the buffer
-// length is exceeded.
-
-static int WideCharToUTF8 (const wchar_t *Wide, unsigned char *pUTF8, int len)
-{
-    const wchar_t *pWide = Wide;
-    int outndx = 0;
-
-    while (*pWide) {
-        if (*pWide < 0x80 && outndx + 1 < len)
-            pUTF8 [outndx++] = (unsigned char) *pWide++;
-        else if (*pWide < 0x800 && outndx + 2 < len) {
-            pUTF8 [outndx++] = (unsigned char) (0xc0 | ((*pWide >> 6) & 0x1f));
-            pUTF8 [outndx++] = (unsigned char) (0x80 | (*pWide++ & 0x3f));
-        }
-        else if (outndx + 3 < len) {
-            pUTF8 [outndx++] = (unsigned char) (0xe0 | ((*pWide >> 12) & 0xf));
-            pUTF8 [outndx++] = (unsigned char) (0x80 | ((*pWide >> 6) & 0x3f));
-            pUTF8 [outndx++] = (unsigned char) (0x80 | (*pWide++ & 0x3f));
-        }
-        else
-            break;
-    }
-
-    pUTF8 [outndx] = 0;
-    return (int)(pWide - Wide);
-}
-
-// Convert a text string into its Unicode UTF-8 format equivalent. The
-// conversion is done in-place so the maximum length of the string buffer must
-// be specified because the string may become longer or shorter. If the
-// resulting string will not fit in the specified buffer size then it is
-// truncated.
-
-static void TextToUTF8 (void *string, int len)
-{
-    unsigned char *inp = string;
-
-    // simple case: test for UTF8 BOM and if so, simply delete the BOM
-
-    if (len > 3 && inp [0] == 0xEF && inp [1] == 0xBB && inp [2] == 0xBF) {
-        memmove (inp, inp + 3, len - 3);
-        inp [len - 3] = 0;
-    }
-    else if (* (wchar_t *) string == 0xFEFF) {
-        wchar_t *temp = _wcsdup (string);
-
-        WideCharToUTF8 (temp + 1, (unsigned char *) string, len);
-        free (temp);
-    }
-    else {
-        int max_chars = (int) strlen (string);
-        wchar_t *temp = (wchar_t *) malloc ((max_chars + 1) * 2);
-
-        MultiByteToWideChar (CP_ACP, 0, string, -1, temp, max_chars + 1);
-        WideCharToUTF8 (temp, (unsigned char *) string, len);
-        free (temp);
-    }
-}
-
-#endif
-
 //////////////////////////////////////////////////////////////////////////////
 // This function displays the progress status on the title bar of the DOS   //
 // window that WavPack is running in. The "file_progress" argument is for   //
@@ -1461,13 +1252,4 @@ static void TextToUTF8 (void *string, int len)
 // account the total number of files to generate a batch progress number.   //
 //////////////////////////////////////////////////////////////////////////////
 
-void display_progress (double file_progress)
-{
-    char title [40];
-
-    if (set_console_title) {
-        file_progress = (file_index + file_progress) / num_files;
-        sprintf (title, "%d%% (WvGain)", (int) ((file_progress * 100.0) + 0.5));
-        DoSetConsoleTitle (title);
-    }
-}
+void display_progress (double file_progress) {}
