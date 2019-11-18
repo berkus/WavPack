@@ -70,6 +70,8 @@ typedef int32_t f32;
 
 // ID3v1 and APEv2 TAG formats (may occur at the end of WavPack files)
 
+// use crate ape
+
 typedef struct {
     char tag_id [3], title [30], artist [30], album [30];
     char year [4], comment [30], genre;
@@ -99,6 +101,8 @@ typedef struct {
 
 // RIFF / wav header formats (these occur at the beginning of both wav files
 // and pre-4.0 WavPack files that are not in the "raw" mode)
+
+// use crate riff (or riff-wave?)
 
 typedef struct {
     char ckID [4];

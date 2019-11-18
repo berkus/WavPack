@@ -9,6 +9,7 @@
 // caff.c
 
 // This module is a helper to the WavPack command-line programs to support CAF files.
+// Use crate `caf`
 
 #include <string.h>
 #include <stdlib.h>
@@ -24,7 +25,6 @@
 #ifdef _WIN32
 #define strdup(x) _strdup(x)
 #endif
-
 
 #define WAVPACK_NO_ERROR    0
 #define WAVPACK_SOFT_ERROR  1
